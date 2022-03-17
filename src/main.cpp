@@ -8,7 +8,8 @@
 #define COLOR_ORDER grb
 
 // Set color here (RGB)
-#define COLOR {255, 0, 0}
+#define COLOR_TOP {0, 0, 255}
+#define COLOR_BOT {255, 255, 0}
 
 /* Resets the WS2812 after programming 
  *
@@ -38,7 +39,7 @@ void fill_strip(ws2812_cpp *ws2812_dev, ws2812_rgb *color, uint16_t strip_size) 
 
 // On GATE Rise
 void on_rise(ws2812_cpp *ws2812_dev) {
-	ws2812_rgb color = COLOR;
+	ws2812_rgb color = {0,0,0};
 	fill_strip(ws2812_dev, &color, N_LEDS);
 }
 
@@ -73,22 +74,21 @@ void setup() {
 
 	pinMode(GATE_INPUT, INPUT);
 
-	// rst_after_prog(ws2812_dev);
+	rst_after_prog(ws2812_dev);
 
+	ws2812_rgb top = COLOR_TOP;
+	ws2812_rgb bot = COLOR_BOT;
+
+	ws2812_dev->prep_tx();
+	uint8_t i;
+	for (i = 0; i < N_LEDS/2; i++) {
+		ws2812_dev->tx(&bot, 1);
+	}
+	for (; i < N_LEDS; i++) {
+		ws2812_dev->tx(&top, 1);
+	}
+	ws2812_dev->close_tx();
 }
 
 void loop() {
-	static bool prev_gate = digitalRead(GATE_INPUT);
-	bool gate = digitalRead(GATE_INPUT);
-
-	if (!prev_gate && gate)
-		on_rise(ws2812_dev);
-	else if (prev_gate && !gate)
-		on_fall(ws2812_dev);
-	else if (gate)
-		on_high(ws2812_dev);
-	else
-		on_low(ws2812_dev);
-
-	prev_gate = gate;
 }
