@@ -1,64 +1,137 @@
 #include <Arduino.h>
 #include <ws2812_cpp.h>
 
-#define GATE_INPUT 2
-#define DATA_PINS {0}
-#define N_LEDS 17
-#define RESET_TIME 50
+#define N_LEDS 75
+#define RESET_TIME 75
 #define COLOR_ORDER grb
 
-// On GATE Rise
-void on_rise(ws2812_cpp *ws2812_dev) {
-	// Add your tiny-WS2812 code here (prep_tx, tx, end_tx etc.)
-	return;
-}
+uint8_t GATE_INPUTS[] = {
+	A2,
+	A3,
+	A0,
+	A1
+};
 
-// On GATE High
-void on_high(ws2812_cpp *ws2812_dev) {
-	// Add your tiny-WS2812 code here (prep_tx, tx, end_tx etc.)
-	return;
-}
+struct strip_data {
+	uint8_t pin;
+	ws2812_rgb rgb;
+};
 
-// On GATE Fall
-void on_fall(ws2812_cpp *ws2812_dev) {
-	// Add your tiny-WS2812 code here (prep_tx, tx, end_tx etc.)
-	return;
-}
+strip_data STRIPS[] = 
+{
+	{
+		8, 
+		{255, 255, 255}
+	},
+	{
+		9,
+		{255, 255, 255}
+	},
+	{
+		10,
+		{255, 255, 255}
+	},
+	{
+		11, 
+		{255, 255, 255}
+	}
+};
 
-// On GATE Low
-void on_low(ws2812_cpp *ws8212_dev) {
-	// Add your tiny-WS2812 code here (prep_tx, tx, end_tx etc.)
-	return;
-}
+enum gate_state {
+	HI,
+	LO,
+	RISE,
+	FALL
+};
 
-ws2812_cpp *ws2812_dev;
+class Gate {
+	uint8_t pin;
+	bool prev;
+	gate_state _state;
+
+public:
+	Gate(uint8_t pin) : pin(pin) {
+		pinMode(pin, INPUT);
+		prev = digitalRead(pin);
+		update();
+	}
+
+	void update() {
+		bool curr = digitalRead(pin);
+		if (curr && !prev) {
+			_state = RISE;
+		} else if (!curr && prev) {
+			_state = FALL;
+		} else if (curr) {
+			_state = HI;
+		} else {
+			_state = LO;
+		}
+		prev = curr;
+	}
+
+	gate_state state() {
+		return _state;
+	}
+};
+
+ws2812_rgb OFF = {0,0,0};
+
+ws2812_cpp *ws2812_dev[sizeof(GATE_INPUTS)];
+Gate *gates[sizeof(GATE_INPUTS)];
 
 void setup() {
-	uint8_t pins[] = DATA_PINS;
-	ws2812_cfg cfg;
+	
+	Serial.begin(9600);
 
-	cfg.pins = pins;
-	cfg.n_dev = sizeof(pins);
-	cfg.rst_time_us = RESET_TIME;
-	cfg.order = grb;
+	uint8_t n_gates = sizeof(GATE_INPUTS);
+	for (uint8_t i = 0; i < n_gates; i++) {
+		gates[i] = new Gate(GATE_INPUTS[i]);
+	}
 
-	ws2812_dev = new ws2812_cpp(cfg, nullptr); // WS2812 device
+	uint8_t n_strips = n_gates;
+	for (uint8_t i = 0; i < n_strips; i++) {
+		pinMode(STRIPS[i].pin, OUTPUT);
 
-	pinMode(GATE_INPUT, INPUT);
+		ws2812_cfg cfg;
+		cfg.pins = &STRIPS[i].pin;
+		cfg.n_dev = 1;
+		cfg.rst_time_us = RESET_TIME;
+		cfg.order = grb;
+
+		ws2812_dev[i] = new ws2812_cpp(cfg, NULL);
+	}
+
+	ws2812_dev[0]->prep_tx();
+	for (uint8_t i = 0; i < sizeof(GATE_INPUTS); i++) {
+		for (uint8_t j = 0; j < N_LEDS; j++)
+			ws2812_dev[i]->tx(&STRIPS[i].rgb, sizeof(STRIPS[i].rgb)/sizeof(ws2812_rgb));
+	}
+	ws2812_dev[0]->close_tx();
+
+	delay(1000);
+
+	ws2812_dev[0]->prep_tx();
+	for (uint8_t i = 0; i < sizeof(GATE_INPUTS); i++) {
+		for (uint8_t j = 0; j < N_LEDS; j++)
+			ws2812_dev[i]->tx(&OFF, sizeof(OFF)/sizeof(ws2812_rgb));
+	}
+	ws2812_dev[0]->close_tx();
+	
 }
 
 void loop() {
-	static bool prev_gate = digitalRead(GATE_INPUT);
-	bool gate = digitalRead(GATE_INPUT);
-
-	if (!prev_gate && gate)
-		on_rise(ws2812_dev);
-	else if (prev_gate && !gate)
-		on_fall(ws2812_dev);
-	else if (gate)
-		on_high(ws2812_dev);
-	else
-		on_low(ws2812_dev);
-
-	prev_gate = gate;
+	ws2812_dev[0]->prep_tx();
+	for (uint8_t i = 0; i < sizeof(GATE_INPUTS); i++) {
+		gates[i]->update();
+		if (gates[i]->state() == RISE) {
+			for (uint8_t j = 0; j < N_LEDS; j++)
+				ws2812_dev[i]->tx(&STRIPS[i].rgb, sizeof(STRIPS[i].rgb)/sizeof(ws2812_rgb));
+		}
+		else if (gates[i]->state() == FALL) {
+			for (uint8_t j = 0; j < N_LEDS; j++)
+				ws2812_dev[i]->tx(&OFF, sizeof(OFF)/sizeof(ws2812_rgb));
+		}
+	}
+	ws2812_dev[0]->close_tx();
 }
