@@ -86,7 +86,8 @@ void setup() {
 
 	uint8_t n_gates = sizeof(GATE_INPUTS);
 	for (uint8_t i = 0; i < n_gates; i++) {
-		gates[i] = new Gate(GATE_INPUTS[i]);
+		// gates[i] = new Gate(GATE_INPUTS[i]);
+		pinMode(GATE_INPUTS[i], INPUT);
 	}
 
 	uint8_t n_strips = n_gates;
@@ -117,18 +118,18 @@ void setup() {
 			ws2812_dev[i]->tx(&OFF, sizeof(OFF)/sizeof(ws2812_rgb));
 	}
 	ws2812_dev[0]->close_tx();
-	
+
+	delay(100);
 }
 
 void loop() {
 	ws2812_dev[0]->prep_tx();
 	for (uint8_t i = 0; i < sizeof(GATE_INPUTS); i++) {
-		gates[i]->update();
-		if (gates[i]->state() == RISE) {
+		if (digitalRead(GATE_INPUTS[i])) {
 			for (uint8_t j = 0; j < N_LEDS; j++)
 				ws2812_dev[i]->tx(&STRIPS[i].rgb, sizeof(STRIPS[i].rgb)/sizeof(ws2812_rgb));
 		}
-		else if (gates[i]->state() == FALL) {
+		else {
 			for (uint8_t j = 0; j < N_LEDS; j++)
 				ws2812_dev[i]->tx(&OFF, sizeof(OFF)/sizeof(ws2812_rgb));
 		}
