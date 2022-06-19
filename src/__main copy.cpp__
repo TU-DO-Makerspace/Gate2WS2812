@@ -22,22 +22,22 @@ strip_data STRIPS[] =
 	// Below DJ
 	{
 		8, 
-		{255, 255, 255}
+		{255, 30, 0}
 	},
 	// Left
 	{
 		9,
-		{255, 255, 255}                                                                                                                                                                                                                                                 
+		{255, 0, 255}
 	},
 	// Right
 	{
 		10,
-		{255, 255, 255}
+		{255, 0, 255}
 	},
 	// Back
 	{
 		11, 
-		{255, 255, 0}
+		{255, 30, 0}
 	}
 };
 
@@ -80,6 +80,8 @@ public:
 };
 
 ws2812_rgb OFF = {0,0,0};
+ws2812_rgb ORANGE = {255,30,0};
+
 
 ws2812_cpp *ws2812_dev[sizeof(GATE_INPUTS)];
 Gate *gates[sizeof(GATE_INPUTS)];
@@ -129,9 +131,13 @@ void setup() {
 void loop() {
 	ws2812_dev[0]->prep_tx();
 	for (uint8_t i = 0; i < sizeof(GATE_INPUTS); i++) {
+		static bool toggle = false;
 		if (digitalRead(GATE_INPUTS[i])) {
-			for (uint8_t j = 0; j < N_LEDS; j++)
+			for (uint8_t j = 0; j < N_LEDS/2; j++)
 				ws2812_dev[i]->tx(&STRIPS[i].rgb, sizeof(STRIPS[i].rgb)/sizeof(ws2812_rgb));
+			for (uint8_t j = 0; j < N_LEDS - (N_LEDS/2); j++)
+				ws2812_dev[i]->tx(&ORANGE, sizeof(STRIPS[i].rgb)/sizeof(ws2812_rgb));
+			toggle = !toggle;
 		}
 		else {
 			for (uint8_t j = 0; j < N_LEDS; j++)
